@@ -24,8 +24,15 @@ export default function AdminSitesPage() {
     // 新規登録フォーム用 state
     const [name, setName] = useState('')
     const [address, setAddress] = useState('')
-    const [radiusMeter, setRadiusMeter] = useState('100') // ★ 許容半径のstateを追加（デフォルト100m）
+    const [radiusMeter, setRadiusMeter] = useState('100')
     const [submitting, setSubmitting] = useState(false)
+
+    // 編集モーダル用 state
+    const [editingSite, setEditingSite] = useState<Site | null>(null)
+    const [editName, setEditName] = useState('')
+    const [editAddress, setEditAddress] = useState('')
+    const [editRadiusMeter, setEditRadiusMeter] = useState('100')
+    const [updating, setUpdating] = useState(false)
 
     // 現場一覧の取得
     const fetchSites = async () => {
@@ -69,7 +76,7 @@ export default function AdminSitesPage() {
                 body: JSON.stringify({
                     name,
                     address,
-                    radiusMeter: radiusMeter ? parseInt(radiusMeter, 10) : 100, // ★ 半径を数値で送信
+                    radiusMeter: radiusMeter ? parseInt(radiusMeter, 10) : 100,
                 }),
             })
             const data = await res.json()
@@ -85,6 +92,44 @@ export default function AdminSitesPage() {
             console.error('登録エラー', error)
         } finally {
             setSubmitting(false)
+        }
+    }
+
+    // 編集モーダルを開く
+    const openEditModal = (site: Site) => {
+        setEditingSite(site)
+        setEditName(site.name)
+        setEditAddress(site.address || '')
+        setEditRadiusMeter(site.radiusMeter.toString())
+    }
+
+    // 現場情報の更新処理
+    const handleUpdate = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!editingSite || !editName.trim()) return
+
+        setUpdating(true)
+        try {
+            const res = await fetch(`/api/admin/sites/${editingSite.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editName,
+                    address: editAddress,
+                    radiusMeter: editRadiusMeter ? parseInt(editRadiusMeter, 10) : 100,
+                }),
+            })
+            const data = await res.json()
+            if (data.success) {
+                setEditingSite(null)
+                fetchSites()
+            } else {
+                alert(data.error || '更新に失敗しました。')
+            }
+        } catch (error) {
+            console.error('更新エラー', error)
+        } finally {
+            setUpdating(false)
         }
     }
 
@@ -114,14 +159,14 @@ export default function AdminSitesPage() {
     }
 
     return (
-        <main className="min-h-screen bg-gray-50 p-8">
+        <main className="min-h-screen bg-gray-50 p-8 relative">
             <div className="max-w-5xl mx-auto space-y-6">
 
                 {/* ヘッダー */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800">現場マスタ管理</h1>
-                        <p className="text-sm text-gray-500">打刻対象となる現場の登録・表示切替を行います</p>
+                        <p className="text-sm text-gray-500">打刻対象となる現場の登録・編集・表示切替を行います</p>
                     </div>
                     <button
                         onClick={() => router.push('/admin')}
@@ -199,7 +244,7 @@ export default function AdminSitesPage() {
                             <tbody className="divide-y divide-gray-100 text-sm">
                                 {sites.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="p-8 text-center text-gray-400">
+                                        <td colSpan={6} className="p-8 text-center text-gray-400">
                                             登録されている現場がありません。
                                         </td>
                                     </tr>
@@ -234,11 +279,17 @@ export default function AdminSitesPage() {
                                                     </span>
                                                 ) : (
                                                     <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-xs font-bold">
-                                                        非表示（アーカイブ）
+                                                        非表示
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="p-4 text-right">
+                                            <td className="p-4 text-right space-x-2">
+                                                <button
+                                                    onClick={() => openEditModal(site)}
+                                                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition"
+                                                >
+                                                    編集
+                                                </button>
                                                 <button
                                                     onClick={() => toggleActive(site.id, site.isActive)}
                                                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${site.isActive
@@ -258,6 +309,70 @@ export default function AdminSitesPage() {
                 </div>
 
             </div>
+
+            {/* 編集モーダル */}
+            {editingSite && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-xl">
+                        <div className="flex justify-between items-center border-b pb-4">
+                            <h3 className="text-lg font-bold text-gray-800">現場情報の編集</h3>
+                            <button
+                                onClick={() => setEditingSite(null)}
+                                className="text-gray-400 hover:text-gray-600 font-bold"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <form onSubmit={handleUpdate} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1">現場名 *</label>
+                                <input
+                                    type="text"
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1">住所（変更すると自動で座標が再取得されます）</label>
+                                <input
+                                    type="text"
+                                    value={editAddress}
+                                    onChange={(e) => setEditAddress(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1">許容半径 (m)</label>
+                                <input
+                                    type="number"
+                                    value={editRadiusMeter}
+                                    onChange={(e) => setEditRadiusMeter(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    required
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingSite(null)}
+                                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm transition"
+                                >
+                                    キャンセル
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={updating}
+                                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition shadow-sm disabled:opacity-50"
+                                >
+                                    {updating ? '保存中...' : '変更を保存する'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </main>
     )
 }

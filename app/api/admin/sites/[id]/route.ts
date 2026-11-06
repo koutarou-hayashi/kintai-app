@@ -12,26 +12,68 @@ async function checkAdmin() {
     return true
 }
 
-// 現場の更新（表示・非表示の切り替え含む）
+// 現場情報の更新 (PATCH)
 export async function PATCH(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: Promise<{ id: string }> } // ★ paramsをPromiseに変更
 ) {
     try {
         if (!(await checkAdmin())) {
             return NextResponse.json({ success: false, error: '権限がありません。' }, { status: 403 })
         }
 
-        const resolvedParams = await params
-        const id = resolvedParams.id
+        const resolvedParams = await params // ★ awaitでアンラップ
+        const siteId = resolvedParams.id
+
         const body = await request.json()
+        const { name, address, radiusMeter, isActive } = body
+
+        // 既存の現場情報を取得
+        const existingSite = await prisma.site.findUnique({
+            where: { id: siteId },
+        })
+
+        if (!existingSite) {
+            return NextResponse.json({ success: false, error: '対象の現場が見つかりません。' }, { status: 404 })
+        }
+
+        let lat = existingSite.latitude
+        let lng = existingSite.longitude
+
+        // 住所が変更された場合は、国土地理院APIで緯度経度を再取得
+        if (address !== undefined && address !== existingSite.address) {
+            if (address) {
+                try {
+                    const encodeAddr = encodeURIComponent(address)
+                    const res = await fetch(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeAddr}`)
+                    const data = await res.json()
+
+                    if (data && data.length > 0) {
+                        const coordinates = data[0].geometry.coordinates
+                        lng = coordinates[0]
+                        lat = coordinates[1]
+                    } else {
+                        lat = null
+                        lng = null
+                    }
+                } catch (geoErr) {
+                    console.error('国土地理院ジオコーディングエラー:', geoErr)
+                }
+            } else {
+                lat = null
+                lng = null
+            }
+        }
 
         const updatedSite = await prisma.site.update({
-            where: { id },
+            where: { id: siteId },
             data: {
-                ...(body.name !== undefined && { name: body.name }),
-                ...(body.address !== undefined && { address: body.address }),
-                ...(body.isActive !== undefined && { isActive: body.isActive }),
+                name: name !== undefined ? name : existingSite.name,
+                address: address !== undefined ? address : existingSite.address,
+                latitude: lat,
+                longitude: lng,
+                radiusMeter: radiusMeter !== undefined ? parseInt(radiusMeter, 10) : existingSite.radiusMeter,
+                isActive: isActive !== undefined ? isActive : existingSite.isActive,
             },
         })
 
