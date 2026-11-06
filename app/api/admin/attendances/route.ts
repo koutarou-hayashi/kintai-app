@@ -17,12 +17,15 @@ export async function GET() {
         const today = new Date()
         today.setHours(0, 0, 0, 0)
 
-        // 2. 全ユーザーと本日の打刻データを紐づけて取得
+        // 2. 全ユーザーと本日の打刻データ（および現場情報）を紐づけて取得
         const usersWithAttendance = await prisma.user.findMany({
             include: {
                 attendances: {
                     where: {
                         workDate: today,
+                    },
+                    include: {
+                        site: true, // ★ 現場情報をここに含める
                     },
                 },
             },
@@ -47,6 +50,7 @@ export async function GET() {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                siteName: att?.site?.name || '未選択', // ★ 現場名を追加（未打刻や未選択なら「未選択」）
                 status: att ? att.status : 'not_clocked',
                 clockInTime: att?.clockInTime ? new Date(att.clockInTime).toLocaleTimeString('ja-JP') : '-',
                 clockOutTime: att?.clockOutTime ? new Date(att.clockOutTime).toLocaleTimeString('ja-JP') : '-',
@@ -54,7 +58,6 @@ export async function GET() {
                 clockInLng: att?.clockInLng !== null && att?.clockInLng !== undefined ? Number(att.clockInLng) : null,
                 clockOutLat: att?.clockOutLat !== null && att?.clockOutLat !== undefined ? Number(att.clockOutLat) : null,
                 clockOutLng: att?.clockOutLng !== null && att?.clockOutLng !== undefined ? Number(att.clockOutLng) : null,
-                // 追加：休憩時間と実労働時間（数値とフォーマット済み文字列）
                 breakMinutes: breakMins,
                 workMinutes: workMins,
                 breakFormatted: formatMinutes(breakMins),

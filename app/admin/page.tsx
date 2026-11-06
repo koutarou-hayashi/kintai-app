@@ -9,6 +9,7 @@ type AttendanceRow = {
     id: string
     name: string
     email: string
+    siteName: string
     role: string
     status: string
     clockInTime: string
@@ -125,6 +126,7 @@ export default function AdminDashboard() {
                             <thead>
                                 <tr className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
                                     <th className="p-4">社員名</th>
+                                    <th className="p-4">作業現場</th>
                                     <th className="p-4">ステータス</th>
                                     <th className="p-4">出勤時刻</th>
                                     <th className="p-4">出勤GPS (緯度, 経度)</th>
@@ -147,6 +149,11 @@ export default function AdminDashboard() {
                                             <td className="p-4 font-medium text-gray-800">
                                                 {row.name}
                                                 <span className="block text-xs text-gray-400">{row.email}</span>
+                                            </td>
+                                            <td className="p-4">
+                                                <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold">
+                                                    {row.siteName || '未選択'}
+                                                </span>
                                             </td>
                                             <td className="p-4">
                                                 {row.status === 'working' && (

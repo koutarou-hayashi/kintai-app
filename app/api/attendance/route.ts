@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
         const userId = (session.user as any).id
         const body = await request.json()
-        const { type, lat, lng } = body // type: 'in' | 'out' | 'break_in' | 'break_out'
+        const { type, lat, lng, siteId } = body
 
         // 今日の日付（00:00:00）を取得
         const today = new Date()
@@ -32,12 +32,18 @@ export async function POST(request: Request) {
                 return NextResponse.json({ success: false, error: 'すでに本日は出勤打刻済みです。' }, { status: 400 })
             }
 
+            // ★ 出勤時に現場が選択されているか、またはデータがあるかチェック
+            if (!siteId) {
+                return NextResponse.json({ success: false, error: '作業現場が選択されていません。' }, { status: 400 })
+            }
+
             attendance = await prisma.attendance.upsert({
                 where: { userId_workDate: { userId, workDate: today } },
                 update: {
                     clockInTime: now,
                     clockInLat: lat || null,
                     clockInLng: lng || null,
+                    siteId: siteId, // ★ 現場IDを保存
                     status: 'working',
                 },
                 create: {
@@ -46,9 +52,10 @@ export async function POST(request: Request) {
                     clockInTime: now,
                     clockInLat: lat || null,
                     clockInLng: lng || null,
+                    siteId: siteId, // ★ 現場IDを保存
                     status: 'working',
                 },
-                include: { breaks: true },
+                include: { breaks: true, site: true }, // 必要に応じて現場情報もレスポンスに含める
             })
         } else if (type === 'out') {
             if (!attendance || !attendance.clockInTime) {

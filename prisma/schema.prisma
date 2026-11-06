@@ -41,6 +41,9 @@ model Attendance {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  siteId        String?   @map("site_id")
+  site          Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   breaks Break[]
 
@@ -91,4 +94,21 @@ model PaidLeaveGrant {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("paid_leave_grants")
+}
+
+// 現場・勤務地マスタ
+model Site {
+  id          String   @id @default(uuid())
+  name        String   // 現場名（例: 「〇〇ビル測量現場」「A社 敷地調査」など）
+  address     String?  // 住所（任意）
+  latitude    Float?   // 緯度（将来のジオフェンス用）
+  longitude   Float?   // 経度（将来のジオフェンス用）
+  radiusMeter Int      @default(100) @map("radius_meter") // 許容半径（メートル）
+  isActive    Boolean  @default(true) @map("is_active") // 表示・非表示（true: 表示, false: 非表示）
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  attendances Attendance[] // どの現場で打刻したか紐付ける場合
+
+  @@map("sites")
 }

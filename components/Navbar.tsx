@@ -75,6 +75,15 @@ export default function Navbar() {
                                 >
                                     休暇承認管理
                                 </Link>
+
+                                <Link
+                                    href="/admin/sites"
+                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition ${pathname === '/admin/sites'
+                                        ? 'bg-blue-50 text-blue-700 font-bold'
+                                        : 'text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    現場管理
+                                </Link>
                             </>
                         )}
                     </nav>

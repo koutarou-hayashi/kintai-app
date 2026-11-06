@@ -2,8 +2,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+
+type Site = {
+  id: string
+  name: string
+  address: string | null
+}
 
 export default function Home() {
   const { data: session, status } = useSession()
@@ -11,9 +17,26 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
+  // 現場選択用のstate
+  const [sites, setSites] = useState<Site[]>([])
+  const [selectedSiteId, setSelectedSiteId] = useState('')
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
+    } else if (status === 'authenticated') {
+      // 有効な現場一覧を取得
+      fetch('/api/admin/sites?active=true')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.sites) {
+            setSites(data.sites)
+            if (data.sites.length > 0) {
+              setSelectedSiteId(data.sites[0].id) // 初期選択
+            }
+          }
+        })
+        .catch((err) => console.error('現場一覧の取得に失敗しました', err))
     }
   }, [status, router])
 
@@ -27,9 +50,13 @@ export default function Home() {
 
   if (!session) return null
 
-  const userName = session.user?.name || 'ユーザー'
-
   const handleClock = (type: 'in' | 'out' | 'break_in' | 'break_out') => {
+    // 出勤のときは現場が選択されているかチェック
+    if (type === 'in' && !selectedSiteId) {
+      alert('作業現場を選択してください。')
+      return
+    }
+
     if (!navigator.geolocation) {
       alert('お使いのブラウザは位置情報に対応していません。')
       return
@@ -47,7 +74,12 @@ export default function Home() {
           const res = await fetch('/api/attendance', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type, lat, lng }),
+            body: JSON.stringify({
+              type,
+              lat,
+              lng,
+              siteId: type === 'in' ? selectedSiteId : undefined, // 出勤時のみ現場IDを送る
+            }),
           })
 
           const data = await res.json()
@@ -86,10 +118,30 @@ export default function Home() {
           現在地（GPS）を自動取得して打刻します
         </div>
 
+        {/* 現場選択プルダウン（出勤時や作業前に選択） */}
+        <div className="space-y-1 text-left">
+          <label className="block text-xs font-bold text-gray-600">作業現場の選択</label>
+          <select
+            value={selectedSiteId}
+            onChange={(e) => setSelectedSiteId(e.target.value)}
+            className="w-full px-4 py-2.5 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            {sites.length === 0 ? (
+              <option value="">選択できる現場がありません</option>
+            ) : (
+              sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name} {site.address ? `(${site.address})` : ''}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+
         <div className="flex flex-col gap-3">
           <button
             onClick={() => handleClock('in')}
-            disabled={loading}
+            disabled={loading || sites.length === 0}
             className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 text-sm"
           >
             出勤する
