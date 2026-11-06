@@ -10,12 +10,16 @@ export async function PATCH(
 ) {
     try {
         const session = await getServerSession(authOptions)
+        if (!session || !session.user) {
+            return NextResponse.json({ success: false, error: 'ログインしていません。' }, { status: 401 })
+        }
+
         const role = (session.user as any).role
-        if (!session || !session.user || (role !== 'admin' && role !== 'manager')) {
+        if (role !== 'admin' && role !== 'manager') {
             return NextResponse.json({ success: false, error: '権限がありません。' }, { status: 403 })
         }
 
-        const adminId = (session.user as any).id
+        const currentUserId = (session.user as any).id
         const resolvedParams = await params
         const id = resolvedParams.id
 
@@ -26,13 +30,31 @@ export async function PATCH(
             return NextResponse.json({ success: false, error: '無効なステータスです。' }, { status: 400 })
         }
 
-        // 該当する申請データを取得
+        // 該当する申請データを取得（申請者のユーザー情報も含めて取得する）
         const leaveRequest = await prisma.leaveRequest.findUnique({
             where: { id },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        managerId: true,
+                    },
+                },
+            },
         })
 
         if (!leaveRequest) {
             return NextResponse.json({ success: false, error: '申請データが見つかりません。' }, { status: 404 })
+        }
+
+        // ★ マネージャーの場合のスコープチェック（自分の部下、または自分自身の申請でなければ弾く）
+        if (role === 'manager') {
+            const isSelf = leaveRequest.userId === currentUserId
+            const isSubordinate = leaveRequest.user.managerId === currentUserId
+
+            if (!isSelf && !isSubordinate) {
+                return NextResponse.json({ success: false, error: '自チームのメンバー以外の申請は承認・否認できません。' }, { status: 403 })
+            }
         }
 
         // すでに承認済み、または否認済みの場合は再処理しない
@@ -47,7 +69,7 @@ export async function PATCH(
                 where: { id },
                 data: {
                     status,
-                    approverId: adminId,
+                    approverId: currentUserId,
                 },
             })
 

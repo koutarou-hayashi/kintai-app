@@ -8,9 +8,14 @@ export async function GET() {
     try {
         const session = await getServerSession(authOptions)
 
-        // 1. 認証チェック & 管理者権限チェック
+        // 1. 認証チェック & 権限チェック（admin または manager）
+        if (!session || !session.user) {
+            return NextResponse.json({ success: false, error: 'ログインしていません。' }, { status: 401 })
+        }
+
+        const userId = (session.user as any).id
         const role = (session.user as any).role
-        if (!session || !session.user || (role !== 'admin' && role !== 'manager')) {
+        if (role !== 'admin' && role !== 'manager') {
             return NextResponse.json({ success: false, error: '権限がありません。' }, { status: 403 })
         }
 
@@ -18,15 +23,30 @@ export async function GET() {
         const today = new Date()
         today.setHours(0, 0, 0, 0)
 
-        // 2. 全ユーザーと本日の打刻データ（および現場情報）を紐づけて取得
+        // ★ 2. ロールに応じたユーザー取得の絞り込み条件（where）を構築
+        let userWhereCondition = {}
+
+        if (role === 'manager') {
+            // マネージャーの場合：「自分自身」＋「部下たち（managerIdが自分のIDのユーザー）」を取得対象にする
+            const subordinates = await prisma.user.findMany({
+                where: { managerId: userId },
+                select: { id: true },
+            })
+            const targetUserIds = [userId, ...subordinates.map((s) => s.id)]
+            userWhereCondition = { id: { in: targetUserIds } }
+        }
+        // admin の場合は {} のまま（全ユーザー対象）
+
+        // 3. 対象ユーザーと本日の打刻データ（および現場情報）を紐づけて取得
         const usersWithAttendance = await prisma.user.findMany({
+            where: userWhereCondition, // ★ ここでスコープを適用
             include: {
                 attendances: {
                     where: {
                         workDate: today,
                     },
                     include: {
-                        site: true, // ★ 現場情報をここに含める
+                        site: true, // 現場情報
                     },
                 },
             },
@@ -51,7 +71,7 @@ export async function GET() {
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                siteName: att?.site?.name || '未選択', // ★ 現場名を追加（未打刻や未選択なら「未選択」）
+                siteName: att?.site?.name || '未選択',
                 status: att ? att.status : 'not_clocked',
                 clockInTime: att?.clockInTime ? new Date(att.clockInTime).toLocaleTimeString('ja-JP') : '-',
                 clockOutTime: att?.clockOutTime ? new Date(att.clockOutTime).toLocaleTimeString('ja-JP') : '-',

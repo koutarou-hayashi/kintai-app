@@ -9,17 +9,23 @@ generator client {
 
 // 1. ユーザーテーブル
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  name          String
-  role          String   @default("employee") // admin, manager, employee
-  azureOid      String?  @map("azure_oid")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id              String           @id @default(uuid())
+  email           String           @unique
+  name            String
+  role            String           @default("employee") // admin, manager, employee
+  azureOid        String?          @map("azure_oid")
+  
+  // ▼ 追加：上司のユーザーID（自己参照）
+  managerId       String?          @map("manager_id")
+  manager         User?            @relation("ManagerSubordinates", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates    User[]           @relation("ManagerSubordinates")
 
-  attendances   Attendance[]
-  leaveRequests LeaveRequest[]
-  paidLeaveGrants  PaidLeaveGrant[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  attendances     Attendance[]
+  leaveRequests   LeaveRequest[]
+  paidLeaveGrants PaidLeaveGrant[]
 
   @@map("users")
 }

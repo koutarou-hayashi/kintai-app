@@ -13,9 +13,22 @@ export async function GET() {
         const userId = (session.user as any).id
         const role = (session.user as any).role
 
-        // ★ 管理者(admin)またはマネージャー(manager)の場合は全件取得、それ以外は自分の分のみ
-        // （もしマネージャーが自分のチームの分だけに絞る場合は、ここでチームID等による条件分岐を追加できます）
-        const whereCondition = (role === 'admin' || role === 'manager') ? {} : { userId }
+        // ★ ロールに応じた絞り込み条件（where）の構築
+        let whereCondition = {}
+
+        if (role === 'manager') {
+            // マネージャーの場合：「自分自身」＋「部下たち（managerIdが自分のID）」の申請に絞る
+            const subordinates = await prisma.user.findMany({
+                where: { managerId: userId },
+                select: { id: true },
+            })
+            const targetUserIds = [userId, ...subordinates.map((s) => s.id)]
+            whereCondition = { userId: { in: targetUserIds } }
+        } else if (role === 'employee') {
+            // 一般社員は自分の分のみ
+            whereCondition = { userId }
+        }
+        // admin の場合は {} のまま（全件取得）
 
         const requests = await prisma.leaveRequest.findMany({
             where: whereCondition,
