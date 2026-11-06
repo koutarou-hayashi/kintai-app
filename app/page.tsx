@@ -11,14 +11,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  // 未認証の場合、自動的に /login にリダイレクト
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
     }
   }, [status, router])
 
-  // 読み込み中の表示
   if (status === 'loading') {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -27,16 +25,11 @@ export default function Home() {
     )
   }
 
-  // 未認証状態の間は何も表示しない（リダイレクトが走るため）
-  if (!session) {
-    return null
-  }
+  if (!session) return null
 
-  // ログイン中のユーザー情報
   const userName = session.user?.name || 'ユーザー'
 
-  // 打刻処理
-  const handleClock = (type: 'in' | 'out') => {
+  const handleClock = (type: 'in' | 'out' | 'break_in' | 'break_out') => {
     if (!navigator.geolocation) {
       alert('お使いのブラウザは位置情報に対応していません。')
       return
@@ -59,7 +52,13 @@ export default function Home() {
 
           const data = await res.json()
           if (data.success) {
-            setMessage(type === 'in' ? '出勤打刻が完了しました！' : '退勤打刻が完了しました！')
+            const messages: Record<string, string> = {
+              in: '出勤打刻が完了しました！',
+              out: '退勤打刻が完了しました！',
+              break_in: '休憩に入りました。',
+              break_out: '休憩から戻りました。',
+            }
+            setMessage(messages[type] || '打刻が完了しました。')
           } else {
             setMessage('打刻に失敗しました: ' + data.error)
           }
@@ -69,7 +68,7 @@ export default function Home() {
           setLoading(false)
         }
       },
-      (error) => {
+      () => {
         setLoading(false)
         setMessage('位置情報の取得に失敗しました。GPSを有効にしてください。')
       },
@@ -81,39 +80,42 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-gray-50">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center space-y-6">
 
-        {/* ヘッダー（ユーザー名とログアウト） */}
-        <div className="flex justify-between items-center border-b pb-4">
-          <div className="text-left">
-            <span className="text-xs text-gray-400 block">ログイン中</span>
-            <span className="text-sm font-bold text-gray-800">{userName}</span>
-          </div>
-          <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="text-xs text-rose-600 hover:text-rose-800 font-medium px-3 py-1 bg-rose-50 rounded-lg transition"
-          >
-            ログアウト
-          </button>
-        </div>
-
         <h1 className="text-xl font-bold text-gray-800">社内勤怠管理システム</h1>
 
         <div className="text-sm text-gray-500">
           現在地（GPS）を自動取得して打刻します
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           <button
             onClick={() => handleClock('in')}
             disabled={loading}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition disabled:opacity-50"
+            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 text-sm"
           >
             出勤する
           </button>
 
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => handleClock('break_in')}
+              disabled={loading}
+              className="py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 text-xs"
+            >
+              休憩に入る
+            </button>
+            <button
+              onClick={() => handleClock('break_out')}
+              disabled={loading}
+              className="py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 text-xs"
+            >
+              休憩戻り
+            </button>
+          </div>
+
           <button
             onClick={() => handleClock('out')}
             disabled={loading}
-            className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-lg transition disabled:opacity-50"
+            className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 text-sm"
           >
             退勤する
           </button>

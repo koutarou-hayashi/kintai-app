@@ -19,6 +19,7 @@ model User {
 
   attendances   Attendance[]
   leaveRequests LeaveRequest[]
+  paidLeaveGrants  PaidLeaveGrant[]
 
   @@map("users")
 }
@@ -76,4 +77,18 @@ model LeaveRequest {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("leave_requests")
+}
+
+model PaidLeaveGrant {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  grantDate    DateTime  @db.Date @map("grant_date")     // 付与日
+  expiredDate  DateTime  @db.Date @map("expired_date")   // 失効日（通常付与から2年）
+  daysGranted  Float     @map("days_granted")            // 付与日数（例: 10日、12日など）
+  daysUsed     Float     @default(0) @map("days_used")   // 消化日数
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("paid_leave_grants")
 }
