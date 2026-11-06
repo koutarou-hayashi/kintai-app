@@ -1,8 +1,23 @@
-// app/api/attendance/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+
+// 2地点の緯度経度から距離（メートル）を計算するヘルパー関数
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371e3 // 地球の半径 (メートル)
+    const φ1 = (lat1 * Math.PI) / 180
+    const φ2 = (lat2 * Math.PI) / 180
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180
+
+    const a =
+        Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+    return R * c // メートル単位の距離
+}
 
 export async function POST(request: Request) {
     try {
@@ -32,9 +47,34 @@ export async function POST(request: Request) {
                 return NextResponse.json({ success: false, error: 'すでに本日は出勤打刻済みです。' }, { status: 400 })
             }
 
-            // ★ 出勤時に現場が選択されているか、またはデータがあるかチェック
             if (!siteId) {
                 return NextResponse.json({ success: false, error: '作業現場が選択されていません。' }, { status: 400 })
+            }
+
+            // 選択された現場の情報を取得
+            const site = await prisma.site.findUnique({
+                where: { id: siteId },
+            })
+
+            if (!site) {
+                return NextResponse.json({ success: false, error: '選択された現場が存在しません。' }, { status: 400 })
+            }
+
+            // 現場に緯度・経度が設定されている場合のみジオフェンス（範囲）チェックを実施
+            if (site.latitude !== null && site.longitude !== null) {
+                if (lat === null || lat === undefined || lng === null || lng === undefined) {
+                    return NextResponse.json({ success: false, error: '位置情報が取得できませんでした。GPSを有効にしてください。' }, { status: 400 })
+                }
+
+                const distance = calculateDistanceMeters(lat, lng, site.latitude, site.longitude)
+                const allowedRadius = site.radiusMeter || 100 // デフォルト100m
+
+                if (distance > allowedRadius) {
+                    return NextResponse.json({
+                        success: false,
+                        error: `現場の範囲外から打刻されています。（現場から約${Math.round(distance)}m離れています。許容範囲: ${allowedRadius}m以内）`,
+                    }, { status: 400 })
+                }
             }
 
             attendance = await prisma.attendance.upsert({
@@ -43,7 +83,7 @@ export async function POST(request: Request) {
                     clockInTime: now,
                     clockInLat: lat || null,
                     clockInLng: lng || null,
-                    siteId: siteId, // ★ 現場IDを保存
+                    siteId: siteId,
                     status: 'working',
                 },
                 create: {
@@ -52,10 +92,10 @@ export async function POST(request: Request) {
                     clockInTime: now,
                     clockInLat: lat || null,
                     clockInLng: lng || null,
-                    siteId: siteId, // ★ 現場IDを保存
+                    siteId: siteId,
                     status: 'working',
                 },
-                include: { breaks: true, site: true }, // 必要に応じて現場情報もレスポンスに含める
+                include: { breaks: true, site: true },
             })
         } else if (type === 'out') {
             if (!attendance || !attendance.clockInTime) {
@@ -84,7 +124,7 @@ export async function POST(request: Request) {
             let totalWorkMinutes = Math.floor(totalWorkMs / (1000 * 60)) - totalBreakMinutes
             if (totalWorkMinutes < 0) totalWorkMinutes = 0
 
-            // 労働基準法に基づく自動休憩控除の適用例（例: 8時間超なら60分、6時間超なら45分を最低保証など、必要に応じて）
+            // 労働基準法に基づく自動休憩控除の適用
             let finalBreakMinutes = totalBreakMinutes
             if (totalWorkMinutes + totalBreakMinutes > 360 && totalBreakMinutes < 45) {
                 finalBreakMinutes = 45
@@ -110,13 +150,11 @@ export async function POST(request: Request) {
             if (!attendance || !attendance.clockInTime || attendance.clockOutTime) {
                 return NextResponse.json({ success: false, error: '勤務中ではありません。' }, { status: 400 })
             }
-            // すでに休憩中（breakEndがnullのレコードがある）かチェック
             const activeBreak = attendance.breaks.find((b) => !b.breakEnd)
             if (activeBreak) {
                 return NextResponse.json({ success: false, error: 'すでに休憩中です。' }, { status: 400 })
             }
 
-            // 新しい休憩レコードを作成
             await prisma.break.create({
                 data: {
                     attendanceId: attendance.id,
@@ -133,7 +171,6 @@ export async function POST(request: Request) {
             if (!attendance) {
                 return NextResponse.json({ success: false, error: '勤怠データが見つかりません。' }, { status: 400 })
             }
-            // 進行中の休憩を探す
             const activeBreak = attendance.breaks.find((b) => !b.breakEnd)
             if (!activeBreak) {
                 return NextResponse.json({ success: false, error: '休憩中ではありません。' }, { status: 400 })
@@ -142,7 +179,6 @@ export async function POST(request: Request) {
             const diffMs = now.getTime() - new Date(activeBreak.breakStart).getTime()
             const diffMinutes = Math.floor(diffMs / (1000 * 60))
 
-            // 休憩を終了し、累積の breakMinutes を更新
             await prisma.break.update({
                 where: { id: activeBreak.id },
                 data: { breakEnd: now },
