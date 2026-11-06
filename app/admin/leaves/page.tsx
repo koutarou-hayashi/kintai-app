@@ -43,8 +43,9 @@ export default function AdminLeavesPage() {
 
         if (status === 'authenticated') {
             const role = (session?.user as any)?.role
-            if (role !== 'admin') {
-                router.push('/') // 管理者以外はトップへリダイレクト
+            // ★ 管理者またはマネージャーを許可するように変更
+            if (role !== 'admin' && role !== 'manager') {
+                router.push('/mypage') // 許可されていない場合はマイページへリダイレクト
                 return
             }
             fetchLeaves()
@@ -100,9 +101,17 @@ export default function AdminLeavesPage() {
             <div className="max-w-5xl mx-auto space-y-6">
 
                 {/* ヘッダー */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm">
-                    <h1 className="text-2xl font-bold text-gray-800">休暇申請の承認管理</h1>
-                    <p className="text-sm text-gray-500 mt-1">社員から提出された有給休暇や欠勤の申請を確認・管理します。</p>
+                <div className="bg-white p-6 rounded-2xl shadow-sm flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-800">休暇申請の承認管理</h1>
+                        <p className="text-sm text-gray-500 mt-1">社員から提出された有給休暇や欠勤の申請を確認・管理します。</p>
+                    </div>
+                    <button
+                        onClick={() => router.push('/admin')}
+                        className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition"
+                    >
+                        管理画面トップへ戻る
+                    </button>
                 </div>
 
                 {/* 申請一覧テーブル / カード */}
@@ -155,8 +164,8 @@ export default function AdminLeavesPage() {
                                             </>
                                         ) : (
                                             <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${item.status === 'approved'
-                                                    ? 'bg-emerald-100 text-emerald-700'
-                                                    : 'bg-rose-100 text-rose-700'
+                                                ? 'bg-emerald-100 text-emerald-700'
+                                                : 'bg-rose-100 text-rose-700'
                                                 }`}>
                                                 {item.status === 'approved' ? '承認済み' : '否認済み'}
                                             </span>

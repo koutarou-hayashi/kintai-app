@@ -4,12 +4,14 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
-async function checkAdmin() {
+// マネージャー以上（admin または manager）をチェックする関数
+async function checkManagerOrAdmin() {
     const session = await getServerSession(authOptions)
-    if (!session || !session.user || (session.user as any).role !== 'admin') {
+    if (!session || !session.user) {
         return false
     }
-    return true
+    const role = (session.user as any).role
+    return role === 'admin' || role === 'manager'
 }
 
 // 現場情報の更新 (PATCH)
@@ -18,7 +20,7 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> } // ★ paramsをPromiseに変更
 ) {
     try {
-        if (!(await checkAdmin())) {
+        if (!(await checkManagerOrAdmin())) {
             return NextResponse.json({ success: false, error: '権限がありません。' }, { status: 403 })
         }
 

@@ -13,7 +13,9 @@ export async function GET() {
         const userId = (session.user as any).id
         const role = (session.user as any).role
 
-        const whereCondition = role === 'admin' ? {} : { userId }
+        // ★ 管理者(admin)またはマネージャー(manager)の場合は全件取得、それ以外は自分の分のみ
+        // （もしマネージャーが自分のチームの分だけに絞る場合は、ここでチームID等による条件分岐を追加できます）
+        const whereCondition = (role === 'admin' || role === 'manager') ? {} : { userId }
 
         const requests = await prisma.leaveRequest.findMany({
             where: whereCondition,
@@ -37,7 +39,6 @@ export async function POST(request: Request) {
         const userId = (session.user as any).id
         const body = await request.json()
 
-        // ▼ ここで body から leaveType をしっかり受け取るように修正！
         const { startDate, endDate, leaveType, reason } = body
 
         if (!startDate || !endDate) {
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
                 userId,
                 startDate: new Date(startDate),
                 endDate: new Date(endDate),
-                leaveType: leaveType || 'paid', // 取得した leaveType を使用
+                leaveType: leaveType || 'paid',
                 reason: reason || '',
                 status: 'pending',
             },

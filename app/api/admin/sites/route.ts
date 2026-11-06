@@ -5,17 +5,19 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 // 管理者権限チェック用のヘルパー
-async function checkAdmin() {
+// マネージャー以上（admin または manager）をチェックする関数
+async function checkManagerOrAdmin() {
     const session = await getServerSession(authOptions)
-    if (!session || !session.user || (session.user as any).role !== 'admin') {
+    if (!session || !session.user) {
         return false
     }
-    return true
+    const role = (session.user as any).role
+    return role === 'admin' || role === 'manager'
 }
 
 export async function GET(request: Request) {
     try {
-        if (!(await checkAdmin())) {
+        if (!(await checkManagerOrAdmin())) {
             return NextResponse.json({ success: false, error: '権限がありません。' }, { status: 403 })
         }
 
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
 // 現場新規作成（国土地理院APIで住所から自動緯度経度取得）
 export async function POST(request: Request) {
     try {
-        if (!(await checkAdmin())) {
+        if (!(await checkManagerOrAdmin())) {
             return NextResponse.json({ success: false, error: '権限がありません。' }, { status: 403 })
         }
 

@@ -55,7 +55,8 @@ export default function AdminSitesPage() {
             return
         }
         if (status === 'authenticated') {
-            if ((session?.user as any)?.role !== 'admin') {
+            const role = (session?.user as any)?.role
+            if (role !== 'admin' && role !== 'manager') {
                 router.push('/mypage')
                 return
             }

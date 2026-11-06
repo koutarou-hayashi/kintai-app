@@ -9,7 +9,8 @@ export async function GET() {
         const session = await getServerSession(authOptions)
 
         // 1. 認証チェック & 管理者権限チェック
-        if (!session || !session.user || (session.user as any).role !== 'admin') {
+        const role = (session.user as any).role
+        if (!session || !session.user || (role !== 'admin' && role !== 'manager')) {
             return NextResponse.json({ success: false, error: '権限がありません。' }, { status: 403 })
         }
 

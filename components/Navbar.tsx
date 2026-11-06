@@ -38,8 +38,8 @@ export default function Navbar() {
                         <Link
                             href="/leaves"
                             className={`px-4 py-2 rounded-xl text-sm font-medium transition ${pathname === '/leaves'
-                                    ? 'bg-emerald-50 text-emerald-700 font-bold'
-                                    : 'text-gray-600 hover:bg-gray-100'
+                                ? 'bg-emerald-50 text-emerald-700 font-bold'
+                                : 'text-gray-600 hover:bg-gray-100'
                                 }`}
                         >
                             休暇申請
@@ -55,8 +55,8 @@ export default function Navbar() {
                             マイページ
                         </Link>
 
-                        {/* 管理者権限を持つユーザーのみ表示されるセクションに追加 */}
-                        {userRole === 'admin' && (
+                        {/* 管理者またはマネージャー権限を持つユーザーに表示するセクション */}
+                        {(userRole === 'admin' || userRole === 'manager') && (
                             <>
                                 <Link
                                     href="/admin"
