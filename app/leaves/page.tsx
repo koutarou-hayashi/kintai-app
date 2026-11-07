@@ -144,27 +144,32 @@ export default function LeavePage() {
                             <p className="text-gray-400 text-sm">申請履歴はありません。</p>
                         ) : (
                             list.map((item) => (
-                                <div key={item.id} className="p-4 border rounded-xl flex justify-between items-center bg-gray-50">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
+                                <div key={item.id} className="p-4 border rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-gray-50">
+                                    {/* 左側：種類、日付、理由 */}
+                                    <div className="space-y-1 w-full sm:w-auto">
+                                        <div className="flex flex-wrap items-center gap-2">
                                             <span className="font-bold text-gray-800 text-sm">
                                                 {getLeaveTypeLabel(item.leaveType)}
                                             </span>
-                                            <span className="text-xs text-gray-500">
-                                                {new Date(item.startDate).toLocaleDateString()} 〜 {new Date(item.endDate).toLocaleDateString()}
-                                            </span>
                                         </div>
-                                        {item.reason && <p className="text-xs text-gray-600">理由: {item.reason}</p>}
+                                        <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
+                                            {new Date(item.startDate).toLocaleDateString()} 〜 {new Date(item.endDate).toLocaleDateString()}
+                                        </span>
+                                        {item.reason && (
+                                            <p className="text-xs text-gray-600 break-words">理由: {item.reason}</p>
+                                        )}
                                     </div>
-                                    <div>
+
+                                    {/* 右側：ステータスバッジ（スマホでも縮まないように shrink-0 を付与） */}
+                                    <div className="shrink-0 self-end sm:self-center">
                                         {item.status === 'pending' && (
-                                            <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">申請中</span>
+                                            <span className="inline-block px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold whitespace-nowrap">申請中</span>
                                         )}
                                         {item.status === 'approved' && (
-                                            <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">承認済み</span>
+                                            <span className="inline-block px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold whitespace-nowrap">承認済み</span>
                                         )}
                                         {item.status === 'rejected' && (
-                                            <span className="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-xs font-bold">否認</span>
+                                            <span className="inline-block px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-xs font-bold whitespace-nowrap">否認</span>
                                         )}
                                     </div>
                                 </div>
@@ -172,7 +177,6 @@ export default function LeavePage() {
                         )}
                     </div>
                 </div>
-
             </div>
         </main>
     )

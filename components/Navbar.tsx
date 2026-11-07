@@ -4,10 +4,17 @@
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 export default function Navbar() {
     const { data: session } = useSession()
     const pathname = usePathname()
+    const [isOpen, setIsOpen] = useState(false)
+
+    // ページが切り替わったらスマホのメニューを自動で閉じる
+    useEffect(() => {
+        setIsOpen(false)
+    }, [pathname])
 
     if (!session || !session.user) {
         return null
@@ -16,13 +23,10 @@ export default function Navbar() {
     const userRole = (session.user as any).role
     const rawName = session.user.name || 'ユーザー'
 
-    // ★ 「名 姓」を「姓 名」に並び替えるフォーマット関数
     const formatUserName = (name: string) => {
         if (!name) return 'ユーザー'
-        // 半角または全角スペースで分割
         const parts = name.trim().split(/[\s ]+/)
         if (parts.length >= 2) {
-            // [名, 姓] の順になっている想定なので、[姓, 名] にひっくり返す
             return `${parts[1]} ${parts[0]}`
         }
         return name
@@ -30,12 +34,20 @@ export default function Navbar() {
 
     const userName = formatUserName(rawName)
 
-    return (
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between sticky top-0 h-screen z-50">
+    // メニューの中身（PCとスマホ共通）
+    const navContent = (
+        <div className="flex flex-col justify-between h-full">
             {/* 上部：タイトル & メニューリンク */}
             <div className="p-6 space-y-8 overflow-y-auto">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between">
                     <span className="font-bold text-gray-800 text-base tracking-wide">社内勤怠システム</span>
+                    {/* スマホ用閉じるボタン */}
+                    <button
+                        onClick={() => setIsOpen(false)}
+                        className="md:hidden text-gray-400 hover:text-gray-600 font-bold text-xl p-1"
+                    >
+                        &times;
+                    </button>
                 </div>
 
                 <nav className="space-y-1.5">
@@ -115,7 +127,7 @@ export default function Navbar() {
             </div>
 
             {/* 下部：ユーザー情報 & ログアウト */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50/50 m-4 rounded-2xl flex items-center justify-between">
+            <div className="p-4 border-t border-gray-100 bg-gray-50/50 m-4 rounded-2xl flex items-center justify-between shrink-0">
                 <div className="overflow-hidden pr-2">
                     <span className="text-[10px] text-gray-400 block">ログイン中</span>
                     <span className="text-sm font-bold text-gray-800 truncate block">{userName}</span>
@@ -127,6 +139,47 @@ export default function Navbar() {
                     ログアウト
                 </button>
             </div>
-        </aside>
+        </div>
+    )
+
+    return (
+        <>
+            {/* ① PC用サイドバー（md以上で常時表示） */}
+            <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 sticky top-0 h-screen z-40 flex-col">
+                {navContent}
+            </aside>
+
+            {/* ② スマホ用トップヘッダー（md未満で表示） */}
+            <header className="md:hidden bg-white border-b border-gray-200 px-4 h-16 flex items-center justify-between sticky top-0 z-40 w-full">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsOpen(true)}
+                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition"
+                        aria-label="メニューを開く"
+                    >
+                        {/* ハンバーガーアイコン */}
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                    <span className="font-bold text-gray-800 text-sm">社内勤怠システム</span>
+                </div>
+            </header>
+
+            {/* ③ スマホ用スライドメニュー（オーバーレイ付きドロワー） */}
+            {isOpen && (
+                <div className="fixed inset-0 z-50 md:hidden flex">
+                    {/* 背景の黒い半透明幕（タップすると閉じる） */}
+                    <div
+                        className="fixed inset-0 bg-black/50 transition-opacity"
+                        onClick={() => setIsOpen(false)}
+                    />
+                    {/* 左側からスライドしてくるメニュー本体 */}
+                    <div className="relative w-72 max-w-[80%] bg-white h-full shadow-2xl z-10 flex flex-col">
+                        {navContent}
+                    </div>
+                </div>
+            )}
+        </>
     )
 }

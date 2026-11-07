@@ -12,10 +12,10 @@ export default function RootLayout({
     <html lang="ja">
       <body className="bg-gray-50 min-h-screen text-gray-800">
         <Providers>
-          {/* 全体を横並びにして、左側にサイドバー、右側にメインコンテンツを配置 */}
-          <div className="flex min-h-screen">
+          {/* PCでは横並び、スマホでは縦積み（上がNavbar、下がコンテンツ） */}
+          <div className="flex flex-col md:flex-row min-h-screen">
             <Navbar />
-            <main className="flex-1 overflow-y-auto">
+            <main className="flex-1 overflow-y-auto w-full">
               {children}
             </main>
           </div>

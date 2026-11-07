@@ -160,25 +160,25 @@ export default function AdminSitesPage() {
     }
 
     return (
-        <main className="min-h-screen bg-gray-50 p-8 relative">
+        <main className="min-h-screen bg-gray-50 p-4 sm:p-8 relative">
             <div className="max-w-5xl mx-auto space-y-6">
 
                 {/* ヘッダー */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm flex justify-between items-center">
+                <div className="bg-white p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800">現場マスタ管理</h1>
-                        <p className="text-sm text-gray-500">打刻対象となる現場の登録・編集・表示切替を行います</p>
+                        <p className="text-sm text-gray-500 mt-1">打刻対象となる現場の登録・編集・表示切替を行います</p>
                     </div>
                     <button
                         onClick={() => router.push('/admin')}
-                        className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition"
+                        className="px-4 py-2 text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition w-full sm:w-auto text-center"
                     >
                         管理画面トップへ戻る
                     </button>
                 </div>
 
                 {/* 新規登録フォーム */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm space-y-4">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm space-y-4">
                     <h2 className="text-lg font-bold text-gray-800">新しい現場を追加</h2>
                     <form onSubmit={handleCreate} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -227,86 +227,151 @@ export default function AdminSitesPage() {
                     </form>
                 </div>
 
-                {/* 現場一覧テーブル */}
-                <div className="bg-white rounded-2xl shadow-sm overflow-hidden p-6">
+                {/* 現場一覧セクション */}
+                <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
                     <h2 className="text-lg font-bold text-gray-800 mb-4">登録済み現場一覧</h2>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
-                                    <th className="p-4">現場名</th>
-                                    <th className="p-4">住所</th>
-                                    <th className="p-4">取得座標 (緯度, 経度)</th>
-                                    <th className="p-4">許容半径</th>
-                                    <th className="p-4">ステータス</th>
-                                    <th className="p-4 text-right">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 text-sm">
-                                {sites.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="p-8 text-center text-gray-400">
-                                            登録されている現場がありません。
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    sites.map((site) => (
-                                        <tr key={site.id} className="hover:bg-gray-50 transition">
-                                            <td className="p-4 font-medium text-gray-800">{site.name}</td>
-                                            <td className="p-4 text-gray-600">{site.address || '未設定'}</td>
-                                            <td className="p-4 text-xs font-mono">
+
+                    {sites.length === 0 ? (
+                        <p className="p-8 text-center text-gray-400 text-sm">登録されている現場がありません。</p>
+                    ) : (
+                        <>
+                            {/* スマホ用カード型レイアウト（md未満で表示） */}
+                            <div className="block md:hidden space-y-4">
+                                {sites.map((site) => (
+                                    <div key={site.id} className="p-4 bg-gray-50 border border-gray-100 rounded-xl space-y-3">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div>
+                                                <span className="font-bold text-gray-800 text-sm block">{site.name}</span>
+                                                <span className="text-xs text-gray-500 block">{site.address || '住所未設定'}</span>
+                                            </div>
+                                            <div>
+                                                {site.isActive ? (
+                                                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold whitespace-nowrap">
+                                                        表示中
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2.5 py-1 bg-gray-200 text-gray-600 rounded-full text-xs font-bold whitespace-nowrap">
+                                                        非表示
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-gray-200/60">
+                                            <div>
+                                                <span className="text-gray-400 block text-[10px]">取得座標</span>
                                                 {site.latitude !== null && site.longitude !== null ? (
                                                     <a
                                                         href={`https://www.google.com/maps?q=${site.latitude},${site.longitude}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:underline flex items-center gap-1"
-                                                        title="Googleマップで確認"
+                                                        className="text-blue-600 hover:underline font-mono text-xs flex items-center gap-1"
                                                     >
-                                                        {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}
-                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                        </svg>
+                                                        📍 {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}
                                                     </a>
                                                 ) : (
-                                                    <span className="text-amber-600 font-sans font-medium">未取得（座標なし）</span>
+                                                    <span className="text-amber-600 text-xs">未取得</span>
                                                 )}
-                                            </td>
-                                            <td className="p-4 text-gray-600 font-mono">{site.radiusMeter} m</td>
-                                            <td className="p-4">
-                                                {site.isActive ? (
-                                                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
-                                                        表示中
-                                                    </span>
-                                                ) : (
-                                                    <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-xs font-bold">
-                                                        非表示
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="p-4 text-right space-x-2">
-                                                <button
-                                                    onClick={() => openEditModal(site)}
-                                                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition"
-                                                >
-                                                    編集
-                                                </button>
-                                                <button
-                                                    onClick={() => toggleActive(site.id, site.isActive)}
-                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${site.isActive
-                                                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-800'
-                                                        : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
-                                                        }`}
-                                                >
-                                                    {site.isActive ? '非表示にする' : '表示に戻す'}
-                                                </button>
-                                            </td>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-400 block text-[10px]">許容半径</span>
+                                                <span className="font-mono text-gray-700 font-medium">{site.radiusMeter} m</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end items-center gap-2 pt-2 border-t border-gray-200/60">
+                                            <button
+                                                onClick={() => openEditModal(site)}
+                                                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition"
+                                            >
+                                                編集
+                                            </button>
+                                            <button
+                                                onClick={() => toggleActive(site.id, site.isActive)}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${site.isActive
+                                                    ? 'bg-amber-100 hover:bg-amber-200 text-amber-800'
+                                                    : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                                                    }`}
+                                            >
+                                                {site.isActive ? '非表示にする' : '表示に戻す'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* PC用テーブルレイアウト（md以上で表示） */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
+                                            <th className="p-4">現場名</th>
+                                            <th className="p-4">住所</th>
+                                            <th className="p-4">取得座標 (緯度, 経度)</th>
+                                            <th className="p-4">許容半径</th>
+                                            <th className="p-4">ステータス</th>
+                                            <th className="p-4 text-right">操作</th>
                                         </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 text-sm">
+                                        {sites.map((site) => (
+                                            <tr key={site.id} className="hover:bg-gray-50 transition">
+                                                <td className="p-4 font-medium text-gray-800 whitespace-nowrap">{site.name}</td>
+                                                <td className="p-4 text-gray-600">{site.address || '未設定'}</td>
+                                                <td className="p-4 text-xs font-mono whitespace-nowrap">
+                                                    {site.latitude !== null && site.longitude !== null ? (
+                                                        <a
+                                                            href={`https://www.google.com/maps?q=${site.latitude},${site.longitude}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-600 hover:underline flex items-center gap-1"
+                                                            title="Googleマップで確認"
+                                                        >
+                                                            {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                            </svg>
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-amber-600 font-sans font-medium">未取得（座標なし）</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-gray-600 font-mono whitespace-nowrap">{site.radiusMeter} m</td>
+                                                <td className="p-4 whitespace-nowrap">
+                                                    {site.isActive ? (
+                                                        <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                                                            表示中
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-xs font-bold">
+                                                            非表示
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                                                    <button
+                                                        onClick={() => openEditModal(site)}
+                                                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition"
+                                                    >
+                                                        編集
+                                                    </button>
+                                                    <button
+                                                        onClick={() => toggleActive(site.id, site.isActive)}
+                                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${site.isActive
+                                                            ? 'bg-amber-100 hover:bg-amber-200 text-amber-800'
+                                                            : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                                                            }`}
+                                                    >
+                                                        {site.isActive ? '非表示にする' : '表示に戻す'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
                 </div>
 
             </div>
