@@ -4,8 +4,6 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-// import AttendanceCorrectionModal from '@/components/AttendanceCorrectionModal' // ★ 先ほどのモーダルをインポート
-import { CLIENT_STATIC_FILES_RUNTIME_MAIN_APP } from 'next/dist/shared/lib/constants'
 
 type Site = {
   id: string
@@ -30,9 +28,6 @@ export default function Home() {
 
   // ★ 現在の勤怠ステータス
   const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatus>('not_clocked')
-
-  // ★ 修正申請モーダルの開閉状態
-  // const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false)
 
   // 1. 時計のタイマー
   useEffect(() => {
@@ -162,13 +157,6 @@ export default function Home() {
 
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">社内勤怠管理システム</h1>
-          {/* 修正申請ボタン */}
-          {/* <button
-            onClick={() => setIsCorrectionModalOpen(true)}
-            className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-1.5 px-3 rounded-lg transition"
-          >
-            修正申請
-          </button> */}
         </div>
 
         {/* リアルタイム時計表示 */}
@@ -254,15 +242,6 @@ export default function Home() {
           </div>
         )}
       </div>
-
-      {/* 打刻修正申請用モーダル
-      <AttendanceCorrectionModal
-        isOpen={isCorrectionModalOpen}
-        onClose={() => setIsCorrectionModalOpen(false)}
-        onSuccess={() => {
-          // 必要であれば再取得などの処理
-        }}
-      /> */}
     </main>
   )
 }
