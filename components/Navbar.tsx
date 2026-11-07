@@ -14,7 +14,21 @@ export default function Navbar() {
     }
 
     const userRole = (session.user as any).role
-    const userName = session.user.name || 'ユーザー'
+    const rawName = session.user.name || 'ユーザー'
+
+    // ★ 「名 姓」を「姓 名」に並び替えるフォーマット関数
+    const formatUserName = (name: string) => {
+        if (!name) return 'ユーザー'
+        // 半角または全角スペースで分割
+        const parts = name.trim().split(/[\s ]+/)
+        if (parts.length >= 2) {
+            // [名, 姓] の順になっている想定なので、[姓, 名] にひっくり返す
+            return `${parts[1]} ${parts[0]}`
+        }
+        return name
+    }
+
+    const userName = formatUserName(rawName)
 
     return (
         <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between sticky top-0 h-screen z-50">
