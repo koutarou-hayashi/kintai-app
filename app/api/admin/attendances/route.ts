@@ -8,7 +8,6 @@ export async function GET() {
     try {
         const session = await getServerSession(authOptions)
 
-        // 1. 認証チェック & 権限チェック（admin または manager）
         if (!session || !session.user) {
             return NextResponse.json({ success: false, error: 'ログインしていません。' }, { status: 401 })
         }
@@ -19,15 +18,17 @@ export async function GET() {
             return NextResponse.json({ success: false, error: '権限がありません。' }, { status: 403 })
         }
 
-        // 本日の日付（00:00:00）を算出
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
+        // 本日の日付（00:00:00）と翌日（00:00:00）を算出（今日作成された、または今日にまたがるデータを広く拾うため）
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
 
-        // ★ 2. ロールに応じたユーザー取得の絞り込み条件（where）を構築
+        const todayEnd = new Date(todayStart)
+        todayEnd.setDate(todayEnd.getDate() + 1)
+
+        // 1. ロールに応じたユーザーIDの絞り込み条件を構築
         let userWhereCondition = {}
 
         if (role === 'manager') {
-            // マネージャーの場合：「自分自身」＋「部下たち（managerIdが自分のIDのユーザー）」を取得対象にする
             const subordinates = await prisma.user.findMany({
                 where: { managerId: userId },
                 select: { id: true },
@@ -35,25 +36,29 @@ export async function GET() {
             const targetUserIds = [userId, ...subordinates.map((s) => s.id)]
             userWhereCondition = { id: { in: targetUserIds } }
         }
-        // admin の場合は {} のまま（全ユーザー対象）
 
-        // 3. 対象ユーザーと本日の打刻データ（および現場情報）を紐づけて取得
+        // 2. ユーザーを取得し、本日の打刻データ（または未退勤のデータ）を柔軟に取得する
         const usersWithAttendance = await prisma.user.findMany({
-            where: userWhereCondition, // ★ ここでスコープを適用
+            where: userWhereCondition,
             include: {
                 attendances: {
                     where: {
-                        workDate: today,
+                        OR: [
+                            // 条件A: 今日作成されたもの、または今日中に打刻されたもの
+                            { createdAt: { gte: todayStart, lt: todayEnd } },
+                            // 条件B: 日をまたいでまだ退勤していないもの（夜勤・アクティブなシフト）
+                            { status: { not: 'out' } },
+                        ],
                     },
                     include: {
-                        site: true, // 現場情報
+                        site: true,
                     },
+                    orderBy: { createdAt: 'desc' },
                 },
             },
             orderBy: { createdAt: 'asc' },
         })
 
-        // フロントエンドで扱いやすい形に整形
         const formatMinutes = (minutes: number) => {
             if (!minutes || minutes === 0) return '-'
             const h = Math.floor(minutes / 60)
@@ -61,28 +66,55 @@ export async function GET() {
             return h > 0 ? `${h}時間${m}分` : `${m}分`
         }
 
-        const list = usersWithAttendance.map((user) => {
-            const att = user.attendances[0] || null
-            const breakMins = att?.breakMinutes || 0
-            const workMins = att?.workMinutes || 0
+        // 3. 1人のユーザーが複数シフトを持っている場合も考慮して、すべての勤務レコードを平坦化（flatten）してリスト化
+        const list: any[] = []
 
-            return {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                siteName: att?.site?.name || '未選択',
-                status: att ? att.status : 'not_clocked',
-                clockInTime: att?.clockInTime ? new Date(att.clockInTime).toLocaleTimeString('ja-JP') : '-',
-                clockOutTime: att?.clockOutTime ? new Date(att.clockOutTime).toLocaleTimeString('ja-JP') : '-',
-                clockInLat: att?.clockInLat !== null && att?.clockInLat !== undefined ? Number(att.clockInLat) : null,
-                clockInLng: att?.clockInLng !== null && att?.clockInLng !== undefined ? Number(att.clockInLng) : null,
-                clockOutLat: att?.clockOutLat !== null && att?.clockOutLat !== undefined ? Number(att.clockOutLat) : null,
-                clockOutLng: att?.clockOutLng !== null && att?.clockOutLng !== undefined ? Number(att.clockOutLng) : null,
-                breakMinutes: breakMins,
-                workMinutes: workMins,
-                breakFormatted: formatMinutes(breakMins),
-                workFormatted: formatMinutes(workMins),
+        usersWithAttendance.forEach((user) => {
+            if (user.attendances.length === 0) {
+                // 打刻データが1件もない場合は「未出勤」として1行表示する
+                list.push({
+                    id: `${user.id}-not-clocked`,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    siteName: '未選択',
+                    status: 'not_clocked',
+                    clockInTime: '-',
+                    clockOutTime: '-',
+                    clockInLat: null,
+                    clockInLng: null,
+                    clockOutLat: null,
+                    clockOutLng: null,
+                    breakMinutes: 0,
+                    workMinutes: 0,
+                    breakFormatted: '-',
+                    workFormatted: '-',
+                })
+            } else {
+                // 勤務データがある場合は、それぞれのシフト（複数可）を個別の行として展開する
+                user.attendances.forEach((att) => {
+                    const breakMins = att.breakMinutes || 0
+                    const workMins = att.workMinutes || 0
+
+                    list.push({
+                        id: att.id, // 各シフトの固有ID
+                        name: user.name,
+                        email: user.email,
+                        role: user.role,
+                        siteName: att.site?.name || '未選択',
+                        status: att.status,
+                        clockInTime: att.clockInTime ? new Date(att.clockInTime).toLocaleTimeString('ja-JP') : '-',
+                        clockOutTime: att.clockOutTime ? new Date(att.clockOutTime).toLocaleTimeString('ja-JP') : '-',
+                        clockInLat: att.clockInLat !== null && att.clockInLat !== undefined ? Number(att.clockInLat) : null,
+                        clockInLng: att.clockInLng !== null && att.clockInLng !== undefined ? Number(att.clockInLng) : null,
+                        clockOutLat: att.clockOutLat !== null && att.clockOutLat !== undefined ? Number(att.clockOutLat) : null,
+                        clockOutLng: att.clockOutLng !== null && att.clockOutLng !== undefined ? Number(att.clockOutLng) : null,
+                        breakMinutes: breakMins,
+                        workMinutes: workMins,
+                        breakFormatted: formatMinutes(breakMins),
+                        workFormatted: formatMinutes(workMins),
+                    })
+                })
             }
         })
 
