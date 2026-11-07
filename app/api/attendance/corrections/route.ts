@@ -57,29 +57,33 @@ export async function POST(request: Request) {
 
         const userId = (session.user as any).id
         const body = await request.json()
-        const { targetDate, newClockInTime, newClockOutTime, newBreakMinutes, reason } = body
+        const { attendanceId, targetDate, newClockInTime, newClockOutTime, newBreakMinutes, reason } = body
 
         if (!targetDate || !reason) {
             return NextResponse.json({ success: false, error: '対象日と修正理由は必須です。' }, { status: 400 })
         }
 
-        // 該当日の既存の勤怠データがあれば紐付ける
         const targetDateObj = new Date(targetDate)
         targetDateObj.setHours(0, 0, 0, 0)
 
-        const existingAttendance = await prisma.attendance.findUnique({
-            where: {
-                userId_workDate: {
+        // ★ attendanceId があればそれを優先し、無ければ日付とユーザーIDで最新のものを検索する
+        let targetAttendanceId = attendanceId || null
+
+        if (!targetAttendanceId) {
+            const existingAttendance = await prisma.attendance.findFirst({
+                where: {
                     userId,
                     workDate: targetDateObj,
                 },
-            },
-        })
+                orderBy: { createdAt: 'desc' },
+            })
+            targetAttendanceId = existingAttendance ? existingAttendance.id : null
+        }
 
         const correctionRequest = await prisma.attendanceCorrectionRequest.create({
             data: {
                 userId,
-                attendanceId: existingAttendance ? existingAttendance.id : null,
+                attendanceId: targetAttendanceId,
                 targetDate: targetDateObj,
                 newClockInTime: newClockInTime ? new Date(newClockInTime) : null,
                 newClockOutTime: newClockOutTime ? new Date(newClockOutTime) : null,

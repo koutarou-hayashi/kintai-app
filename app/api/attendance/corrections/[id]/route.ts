@@ -75,9 +75,9 @@ export async function PATCH(
 
             // 2. 「承認（approved）」の場合のみ、実際の勤怠データを反映・上書きする
             if (status === 'approved') {
-                const { userId, targetDate, newClockInTime, newClockOutTime, newBreakMinutes } = correctionRequest
+                const { userId, attendanceId, targetDate, newClockInTime, newClockOutTime, newBreakMinutes } = correctionRequest
 
-                // 勤務時間（分）の再計算が必要な場合の簡易ロジック
+                // 勤務時間（分）の再計算
                 let workMinutes = 0
                 if (newClockInTime && newClockOutTime) {
                     const diffMs = new Date(newClockOutTime).getTime() - new Date(newClockInTime).getTime()
@@ -86,15 +86,20 @@ export async function PATCH(
                     workMinutes = Math.max(0, totalMinutes - breakMins)
                 }
 
-                // 既存の勤怠データがあるか確認
-                const existingAttendance = await tx.attendance.findUnique({
-                    where: {
-                        userId_workDate: {
-                            userId,
-                            workDate: targetDate,
-                        },
-                    },
-                })
+                // 既存の勤怠データを特定（attendanceId があればそれを優先、無ければ日付で最新を検索）
+                let existingAttendance = null
+                if (attendanceId) {
+                    existingAttendance = await tx.attendance.findUnique({
+                        where: { id: attendanceId },
+                    })
+                }
+
+                if (!existingAttendance) {
+                    existingAttendance = await tx.attendance.findFirst({
+                        where: { userId, workDate: targetDate },
+                        orderBy: { createdAt: 'desc' },
+                    })
+                }
 
                 if (existingAttendance) {
                     // 既存データがある場合は上書き更新

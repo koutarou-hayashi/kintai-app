@@ -1,15 +1,23 @@
 // components/AttendanceCorrectionModal.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+type AttendanceRecord = {
+    id: string
+    date: string // "YYYY/MM/DD" など
+    clockInTime: string // "HH:mm" など
+    clockOutTime: string // "HH:mm" など
+}
 
 type Props = {
     isOpen: boolean
     onClose: () => void
     onSuccess: () => void
+    targetRecord?: AttendanceRecord | null // ★ 選択した行のデータを受け取る
 }
 
-export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }: Props) {
+export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess, targetRecord }: Props) {
     const [targetDate, setTargetDate] = useState('')
     const [newClockInTime, setNewClockInTime] = useState('')
     const [newClockOutTime, setNewClockOutTime] = useState('')
@@ -17,6 +25,34 @@ export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }
     const [reason, setReason] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+
+    // モーダルが開かれたとき、または選択レコードが変わったときに初期値をセット
+    useEffect(() => {
+        if (targetRecord) {
+            // rawDateがあればそれを使い、無ければ "YYYY/MM/DD" から "YYYY-MM-DD" に変換
+            let formattedDate = targetRecord.rawDate || ''
+
+            if (!formattedDate && targetRecord.date) {
+                // "2026/11/07 (土)" などの文字列から "YYYY-MM-DD" 部分だけを抽出
+                const match = targetRecord.date.match(/\d{4}[\/\-]\d{2}[\/\-]\d{2}/)
+                if (match) {
+                    formattedDate = match[0].replace(/\//g, '-')
+                }
+            }
+
+            setTargetDate(formattedDate)
+            setNewClockInTime(targetRecord.clockInTime && targetRecord.clockInTime !== '-' ? targetRecord.clockInTime : '')
+            setNewClockOutTime(targetRecord.clockOutTime && targetRecord.clockOutTime !== '-' ? targetRecord.clockOutTime : '')
+        } else {
+            const todayStr = new Date().toISOString().split('T')[0]
+            setTargetDate(todayStr)
+            setNewClockInTime('')
+            setNewClockOutTime('')
+        }
+        setNewBreakMinutes('60')
+        setReason('')
+        setError('')
+    }, [targetRecord, isOpen])
 
     if (!isOpen) return null
 
@@ -31,7 +67,6 @@ export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }
         setError('')
 
         try {
-            // 日付と時間を結合して ISO 形式（または Date に変換できる文字列）にする
             const clockInISO = newClockInTime ? new Date(`${targetDate}T${newClockInTime}`).toISOString() : null
             const clockOutISO = newClockOutTime ? new Date(`${targetDate}T${newClockOutTime}`).toISOString() : null
 
@@ -39,6 +74,7 @@ export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    attendanceId: targetRecord ? targetRecord.id : null, // 既存の打刻IDがあれば渡す
                     targetDate,
                     newClockInTime: clockInISO,
                     newClockOutTime: clockOutISO,
@@ -66,23 +102,15 @@ export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 space-y-6">
                 <div className="flex justify-between items-center border-b pb-3">
-                    <h2 className="text-lg font-bold text-gray-800">打刻修正の申請</h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 font-bold text-xl"
-                    >
-                        &times;
-                    </button>
+                    <h2 className="text-lg font-bold text-gray-800">
+                        {targetRecord ? `${targetRecord.date} の修正申請` : '打刻修正の申請'}
+                    </h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
                 </div>
 
-                {error && (
-                    <div className="p-3 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg">
-                        {error}
-                    </div>
-                )}
+                {error && <div className="p-3 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* 対象日 */}
                     <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">対象日 *</label>
                         <input
@@ -94,7 +122,6 @@ export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }
                         />
                     </div>
 
-                    {/* 希望の出勤時刻 */}
                     <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">希望出勤時刻</label>
                         <input
@@ -105,7 +132,6 @@ export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }
                         />
                     </div>
 
-                    {/* 希望の退勤時刻 */}
                     <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">希望退勤時刻</label>
                         <input
@@ -116,7 +142,6 @@ export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }
                         />
                     </div>
 
-                    {/* 休憩時間（分） */}
                     <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">休憩時間（分）</label>
                         <input
@@ -127,7 +152,6 @@ export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }
                         />
                     </div>
 
-                    {/* 修正理由 */}
                     <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">修正理由 *</label>
                         <textarea
@@ -135,12 +159,11 @@ export default function AttendanceCorrectionModal({ isOpen, onClose, onSuccess }
                             onChange={(e) => setReason(e.target.value)}
                             required
                             rows={3}
-                            placeholder="例：打刻ボタンを押し忘れたため、09:00出勤に修正をお願いします。"
+                            placeholder="例：打刻時間の記録に誤りがあったため修正をお願いします。"
                             className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                     </div>
 
-                    {/* ボタン */}
                     <div className="flex gap-3 pt-2">
                         <button
                             type="button"
