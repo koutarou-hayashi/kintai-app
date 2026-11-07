@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import AttendanceCorrectionModal from '@/components/AttendanceCorrectionModal' // ★ 先ほどのモーダルをインポート
+import { CLIENT_STATIC_FILES_RUNTIME_MAIN_APP } from 'next/dist/shared/lib/constants'
 
 type Site = {
   id: string
@@ -94,6 +95,7 @@ export default function Home() {
 
   if (!session) return null
 
+  // const handleClock = (type: 'in' | 'out' | 'break_in' | 'break_out') => {
   const handleClock = (type: 'in' | 'out' | 'break_in' | 'break_out') => {
     if (type === 'in' && !selectedSiteId) {
       alert('作業現場を選択してください。')
@@ -211,38 +213,34 @@ export default function Home() {
 
         {/* ボタン群（状態に応じて disabled を厳格に制御） */}
         <div className="flex flex-col gap-3">
-          {/* 出勤する：未出勤の時だけ押せる */}
+          {/* 出勤する */}
           <button
             onClick={() => handleClock('in')}
-            disabled={loading || attendanceStatus !== 'not_clocked' || sites.length === 0}
             className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-40 disabled:bg-gray-300 text-sm"
           >
             出勤する
           </button>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* 休憩開始：勤務中(working)のときだけ押せる */}
+            {/* 休憩開始 */}
             <button
               onClick={() => handleClock('break_in')}
-              disabled={loading || attendanceStatus !== 'working'}
               className="py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-md transition disabled:opacity-40 disabled:bg-gray-300 text-xs"
             >
               休憩開始
             </button>
-            {/* 休憩終了：休憩中(breaking)のときだけ押せる */}
+            {/* 休憩終了 */}
             <button
               onClick={() => handleClock('break_out')}
-              disabled={loading || attendanceStatus !== 'breaking'}
               className="py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-40 disabled:bg-gray-300 text-xs"
             >
               休憩終了
             </button>
           </div>
 
-          {/* 退勤する：勤務中(working)のときだけ押せる */}
+          {/* 退勤する */}
           <button
             onClick={() => handleClock('out')}
-            disabled={loading || attendanceStatus !== 'working'}
             className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-40 disabled:bg-gray-300 text-sm"
           >
             退勤する

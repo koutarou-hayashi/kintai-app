@@ -54,8 +54,6 @@ model Attendance {
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   breaks Break[]
   correctionRequests AttendanceCorrectionRequest[]
-
-  @@unique([userId, workDate])
 }
 
 // 3. 休憩履歴テーブル

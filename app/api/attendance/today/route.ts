@@ -12,16 +12,15 @@ export async function GET() {
         }
         const userId = (session.user as any).id
 
-        // 本日の日付（00:00:00）
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-
-        const attendance = await prisma.attendance.findUnique({
+        // ★ 日付ベースの findUnique ではなく、
+        // 「まだ退勤していない（status !== 'out'）」アクティブな勤務データを最新順で1件取得する
+        const attendance = await prisma.attendance.findFirst({
             where: {
-                userId_workDate: {
-                    userId,
-                    workDate: today,
-                },
+                userId,
+                status: { not: 'out' }, // 退勤済み以外のもの（working, breaking など）
+            },
+            orderBy: {
+                createdAt: 'desc',
             },
             include: {
                 breaks: {
@@ -30,7 +29,7 @@ export async function GET() {
             },
         })
 
-        // ★ データがない場合は attendance: null として JSON を返す
+        // アクティブな勤務データがない場合は、今日すでに退勤したか、未出勤の状態
         if (!attendance) {
             return NextResponse.json({ success: true, attendance: null })
         }

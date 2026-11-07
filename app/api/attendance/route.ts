@@ -1,3 +1,4 @@
+// app/api/attendance/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -30,21 +31,24 @@ export async function POST(request: Request) {
         const body = await request.json()
         const { type, lat, lng, siteId } = body
 
-        // 今日の日付（00:00:00）を取得
+        const now = new Date()
         const today = new Date()
         today.setHours(0, 0, 0, 0)
 
-        // 本日の勤怠レコードを取得
-        let attendance = await prisma.attendance.findUnique({
-            where: { userId_workDate: { userId, workDate: today } },
+        // ★ 現在進行形（まだ退勤していない）のアクティブな勤怠レコードを最新順で1件取得
+        let attendance = await prisma.attendance.findFirst({
+            where: {
+                userId,
+                status: { not: 'out' }, // 退勤済みではないもの（working, breaking など）
+            },
+            orderBy: { createdAt: 'desc' },
             include: { breaks: true },
         })
 
-        const now = new Date()
-
         if (type === 'in') {
-            if (attendance && attendance.clockInTime) {
-                return NextResponse.json({ success: false, error: 'すでに本日は出勤打刻済みです。' }, { status: 400 })
+            // すでに進行中のシフトがある場合は新規出勤させない（二重出勤防止）
+            if (attendance) {
+                return NextResponse.json({ success: false, error: 'すでに勤務中のシフトが存在します。先に退勤を行ってください。' }, { status: 400 })
             }
 
             if (!siteId) {
@@ -77,16 +81,9 @@ export async function POST(request: Request) {
                 }
             }
 
-            attendance = await prisma.attendance.upsert({
-                where: { userId_workDate: { userId, workDate: today } },
-                update: {
-                    clockInTime: now,
-                    clockInLat: lat || null,
-                    clockInLng: lng || null,
-                    siteId: siteId,
-                    status: 'working',
-                },
-                create: {
+            // ★ 新規の勤務レコードを作成（同日であっても独立したレコードとして追加される）
+            attendance = await prisma.attendance.create({
+                data: {
                     userId,
                     workDate: today,
                     clockInTime: now,
@@ -99,10 +96,7 @@ export async function POST(request: Request) {
             })
         } else if (type === 'out') {
             if (!attendance || !attendance.clockInTime) {
-                return NextResponse.json({ success: false, error: '出勤打刻がされていません。' }, { status: 400 })
-            }
-            if (attendance.clockOutTime) {
-                return NextResponse.json({ success: false, error: 'すでに退勤打刻済みです。' }, { status: 400 })
+                return NextResponse.json({ success: false, error: '勤務中のシフトが見つかりません。' }, { status: 400 })
             }
 
             // もし休憩中のまま退勤しようとした場合は未終了の休憩を強制終了する
@@ -119,7 +113,7 @@ export async function POST(request: Request) {
 
             const totalBreakMinutes = attendance.breakMinutes + additionalBreakMinutes
 
-            // 実労働時間の計算（出勤から退勤までの総分数 - 休憩総分数）
+            // 実労働時間の計算
             const totalWorkMs = now.getTime() - new Date(attendance.clockInTime).getTime()
             let totalWorkMinutes = Math.floor(totalWorkMs / (1000 * 60)) - totalBreakMinutes
             if (totalWorkMinutes < 0) totalWorkMinutes = 0
@@ -142,12 +136,12 @@ export async function POST(request: Request) {
                     clockOutLng: lng || null,
                     breakMinutes: finalBreakMinutes,
                     workMinutes: netWorkMinutes,
-                    status: 'finished',
+                    status: 'out', // ステータスを退勤済みに変更
                 },
                 include: { breaks: true },
             })
         } else if (type === 'break_in') {
-            if (!attendance || !attendance.clockInTime || attendance.clockOutTime) {
+            if (!attendance || attendance.status !== 'working') {
                 return NextResponse.json({ success: false, error: '勤務中ではありません。' }, { status: 400 })
             }
             const activeBreak = attendance.breaks.find((b) => !b.breakEnd)
@@ -168,12 +162,12 @@ export async function POST(request: Request) {
                 include: { breaks: true },
             })
         } else if (type === 'break_out') {
-            if (!attendance) {
-                return NextResponse.json({ success: false, error: '勤怠データが見つかりません。' }, { status: 400 })
+            if (!attendance || attendance.status !== 'breaking') {
+                return NextResponse.json({ success: false, error: '休憩中ではありません。' }, { status: 400 })
             }
             const activeBreak = attendance.breaks.find((b) => !b.breakEnd)
             if (!activeBreak) {
-                return NextResponse.json({ success: false, error: '休憩中ではありません。' }, { status: 400 })
+                return NextResponse.json({ success: false, error: '進行中の休憩が見つかりません。' }, { status: 400 })
             }
 
             const diffMs = now.getTime() - new Date(activeBreak.breakStart).getTime()
