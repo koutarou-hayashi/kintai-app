@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import AttendanceCorrectionModal from '@/components/AttendanceCorrectionModal' // ★ 先ほどのモーダルをインポート
 
 type Site = {
   id: string
@@ -11,7 +12,7 @@ type Site = {
   address: string | null
 }
 
-type AttendanceStatus = 'not_clocked' | 'working' | 'break' | 'out'
+type AttendanceStatus = 'not_clocked' | 'working' | 'breaking' | 'out'
 
 export default function Home() {
   const { data: session, status } = useSession()
@@ -26,8 +27,11 @@ export default function Home() {
   const [sites, setSites] = useState<Site[]>([])
   const [selectedSiteId, setSelectedSiteId] = useState('')
 
-  // ★ 現在の勤怠ステータス ('not_clocked' | 'working' | 'break' | 'out')
+  // ★ 現在の勤怠ステータス
   const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatus>('not_clocked')
+
+  // ★ 修正申請モーダルの開閉状態
+  const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false)
 
   // 1. 時計のタイマー
   useEffect(() => {
@@ -52,7 +56,7 @@ export default function Home() {
         if (!data.attendance) {
           setAttendanceStatus('not_clocked')
         } else {
-          setAttendanceStatus(data.attendance.status) // 'working', 'break', 'out' など
+          setAttendanceStatus(data.attendance.status) // 'working', 'breaking', 'out' など
         }
       }
     } catch (err) {
@@ -154,7 +158,16 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-gray-50">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center space-y-6">
 
-        <h1 className="text-xl font-bold text-gray-800">社内勤怠管理システム</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl font-bold text-gray-800">社内勤怠管理システム</h1>
+          {/* 修正申請ボタン */}
+          <button
+            onClick={() => setIsCorrectionModalOpen(true)}
+            className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-1.5 px-3 rounded-lg transition"
+          >
+            修正申請
+          </button>
+        </div>
 
         {/* リアルタイム時計表示 */}
         <div className="bg-gray-900 text-emerald-400 py-4 px-6 rounded-xl shadow-inner">
@@ -164,24 +177,24 @@ export default function Home() {
           <div className="text-3xl font-black tracking-wider font-mono">
             {currentTime ? currentTime.toLocaleTimeString('ja-JP') : '--:--:--'}
           </div>
-          {/* 現在のステータス表示（デバッグ・確認用） */}
+          {/* 現在のステータス表示 */}
           <div className="mt-2 text-xs text-gray-300">
             状態: <span className="font-bold text-emerald-300">
               {attendanceStatus === 'not_clocked' && '未出勤'}
               {attendanceStatus === 'working' && '勤務中'}
-              {attendanceStatus === 'break' && '休憩中'}
+              {attendanceStatus === 'breaking' && '休憩中'}
               {attendanceStatus === 'out' && '退勤済み'}
             </span>
           </div>
         </div>
 
-        {/* 現場選択プルダウン（出勤前のみ変更可能にすると親切） */}
+        {/* 現場選択プルダウン */}
         <div className="space-y-1 text-left">
           <label className="block text-xs font-bold text-gray-600">作業現場の選択</label>
           <select
             value={selectedSiteId}
             onChange={(e) => setSelectedSiteId(e.target.value)}
-            disabled={attendanceStatus === 'working' || attendanceStatus === 'break'}
+            disabled={attendanceStatus === 'working' || attendanceStatus === 'breaking'}
             className="w-full px-4 py-2.5 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100 disabled:text-gray-400"
           >
             {sites.length === 0 ? (
@@ -216,17 +229,17 @@ export default function Home() {
             >
               休憩開始
             </button>
-            {/* 休憩終了：休憩中(break)のときだけ押せる */}
+            {/* 休憩終了：休憩中(breaking)のときだけ押せる */}
             <button
               onClick={() => handleClock('break_out')}
-              disabled={loading || attendanceStatus !== 'break'}
+              disabled={loading || attendanceStatus !== 'breaking'}
               className="py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-40 disabled:bg-gray-300 text-xs"
             >
               休憩終了
             </button>
           </div>
 
-          {/* 退勤する：勤務中(working)のときだけ押せる（休憩中や未出勤時は押せない） */}
+          {/* 退勤する：勤務中(working)のときだけ押せる */}
           <button
             onClick={() => handleClock('out')}
             disabled={loading || attendanceStatus !== 'working'}
@@ -243,6 +256,15 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* 打刻修正申請用モーダル */}
+      <AttendanceCorrectionModal
+        isOpen={isCorrectionModalOpen}
+        onClose={() => setIsCorrectionModalOpen(false)}
+        onSuccess={() => {
+          // 必要であれば再取得などの処理
+        }}
+      />
     </main>
   )
 }

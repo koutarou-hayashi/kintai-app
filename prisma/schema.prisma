@@ -26,6 +26,7 @@ model User {
   attendances     Attendance[]
   leaveRequests   LeaveRequest[]
   paidLeaveGrants PaidLeaveGrant[]
+  correctionRequests AttendanceCorrectionRequest[]
 
   @@map("users")
 }
@@ -52,6 +53,7 @@ model Attendance {
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   breaks Break[]
+  correctionRequests AttendanceCorrectionRequest[]
 
   @@unique([userId, workDate])
 }
@@ -86,6 +88,31 @@ model LeaveRequest {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("leave_requests")
+}
+
+// 5. 打刻修正申請テーブル
+model AttendanceCorrectionRequest {
+  id              String       @id @default(uuid())
+  userId          String       @map("user_id")
+  attendanceId    String?      @map("attendance_id") // 既存の打刻があれば紐付け
+  targetDate      DateTime     @db.Date @map("target_date") // 修正対象の年月日
+  
+  // 変更したい希望の時刻・内容
+  newClockInTime  DateTime?    @map("new_clock_in_time")
+  newClockOutTime DateTime?    @map("new_clock_out_time")
+  newBreakMinutes Int?         @map("new_break_minutes")
+  
+  reason          String       // 修正理由
+  status          String       @default("pending") // pending (承認待ち), approved (承認), rejected (否認)
+  approverId      String?      @map("approver_id") // 承認したマネージャー/管理者のID
+  
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attendance      Attendance?  @relation(fields: [attendanceId], references: [id], onDelete: SetNull)
+
+  @@map("attendance_correction_requests")
 }
 
 model PaidLeaveGrant {
